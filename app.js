@@ -2251,28 +2251,65 @@ function makeTabletFriendly() {
     });
 }
 
+// --- INSTAGRAM & WHATSAPP İÇİN "POINTER" KÖPRÜSÜ ---
+// Bu kod, uygulama içi tarayıcıların gönderdiği farklı sinyalleri yakalar.
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('drawing-canvas');
+    if (!canvas) return;
+
+    // 1. CSS ile zorla dokunma yasağı ekle (JS üzerinden garantiye alıyoruz)
+    canvas.style.touchAction = "none";
+    document.body.style.touchAction = "none";
+    document.body.style.overflow = "hidden";
+
+    // 2. POINTER EVENTS (Modern WebView'ler için kritik)
+    // Instagram parmağı "Pointer" olarak algılarsa bunu "Mouse" gibi davranmaya zorla.
     
-    // 1. Dokunma hareketini, tarayıcı daha algılamadan durdur
-    canvas.addEventListener('touchmove', function(e) {
-        e.preventDefault(); // "Sayfayı kaydırma!" emri
-    }, { passive: false }); // 'passive: false' bu emrin kesin olduğunu belirtir
+    function handlePointer(e) {
+        if (!e.isPrimary) return; // Çoklu dokunmatik karmaşasını önle
+        
+        // Eğer kalem veya parmaksa
+        if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+            
+            // Olayı senin ana kodunun anladığı 'MouseEvent'e dönüştür
+            const eventType = e.type === 'pointerdown' ? 'mousedown' : 
+                              e.type === 'pointermove' ? 'mousemove' : 'mouseup';
+            
+            // Sahte bir mouse olayı oluştur ve canvas'a gönder
+            const mouseEvent = new MouseEvent(eventType, {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
 
-    // 2. Dokunma başlangıcını da koru
-    canvas.addEventListener('touchstart', function(e) {
-        if (e.target === canvas) {
-            e.preventDefault();
+            canvas.dispatchEvent(mouseEvent);
+            
+            // Instagram'ın kaydırma yapmasını engelle
+            // (Sadece çizim araçları seçiliyken engelle ki butonlara basılabilsin)
+            if (currentTool !== 'none') {
+                e.preventDefault();
+            }
         }
+    }
+
+    // Pointer olaylarını dinle
+    canvas.addEventListener('pointerdown', handlePointer, { passive: false });
+    canvas.addEventListener('pointermove', handlePointer, { passive: false });
+    canvas.addEventListener('pointerup', handlePointer, { passive: false });
+    canvas.addEventListener('pointercancel', handlePointer, { passive: false });
+
+    // 3. Klasik Touch olaylarını da garantiye al (Eski yöntem)
+    canvas.addEventListener('touchstart', (e) => {
+        if (currentTool !== 'none') e.preventDefault();
     }, { passive: false });
-}, { passive: false });
 
-// Sayfa yüklendiğinde yamayı çalıştır
-document.addEventListener('DOMContentLoaded', makeTabletFriendly);
-
-// Garanti olsun diye hemen de çalıştır (bazen DOMContentLoaded kaçabilir)
-makeTabletFriendly();
-
+    canvas.addEventListener('touchmove', (e) => {
+        if (currentTool !== 'none') e.preventDefault();
+    }, { passive: false });
+});
 // Olay Dinleyicileri (Sayfa yüklenince, boyut değişince, kaydırılınca)
 window.addEventListener('load', resizeCanvas);
 window.addEventListener('resize', resizeCanvas);
