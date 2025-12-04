@@ -162,33 +162,34 @@ function resizeCanvas() {
 
 // --- app.js ---
 // Koordinatları Düzeltme Fonksiyonu
+// --- app.js ---
+
 function getEventPosition(e) {
-    // Kanvasın sayfadaki konumunu al
     const rect = canvas.getBoundingClientRect();
     
+    // 1. Ekran ile Canvas arasındaki ölçek farkını hesapla
+    // (Bu kısım tabletlerdeki kaymayı çözen sihirli kısımdır)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     let clientX, clientY;
 
-    // 1. Dokunmatik Olayı (Parmağın anlık konumu)
+    // 2. Dokunmatik veya Mouse koordinatını al
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
-    } 
-    // 2. Dokunma Bitişi (Parmağın kalktığı yer)
-    else if (e.changedTouches && e.changedTouches.length > 0) {
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
-    } 
-    // 3. Mouse Olayı
-    else {
+    } else {
         clientX = e.clientX;
         clientY = e.clientY;
     }
 
-    // Ekran koordinatından kanvasın kenar boşluğunu çıkar
-    // Bu işlem, çizimin tam parmak ucunda oluşmasını sağlar
+    // 3. Hesaplama: (Tıklanan Yer - Kenar Boşluğu) * Ölçek
     return { 
-        x: clientX - rect.left, 
-        y: clientY - rect.top 
+        x: (clientX - rect.left) * scaleX, 
+        y: (clientY - rect.top) * scaleY 
     };
 }
 
@@ -2171,6 +2172,19 @@ if (closePdfButton) {
         // 4. Ekranı güncelle
         redrawAllStrokes();
     });
+}
+
+function resizeCanvas() {
+    // Mevcut çizimi kaybetmemek için geçici olarak kaydetmek istersen buraya ek kod gerekir
+    // Ama şimdilik sadece boyutu düzeltiyoruz:
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Eğer bir arka plan resmi varsa veya çizimler varsa, 
+    // canvas boyutu değişince silinirler. Onları tekrar çizdirmek için:
+    if (typeof redrawAllStrokes === 'function') {
+        redrawAllStrokes();
+    }
 }
 
 // --- BAŞLANGIÇ ---
