@@ -25,6 +25,7 @@ const uploadButton = document.getElementById('btn-upload');
 const fileInput = document.getElementById('file-input');
 
 // --- DEĞİŞKENLER ---
+let isTouchActive = false; // Tablette mouse'u engellemek için kilit
 let isDrawing = false; 
 let currentTool = 'none'; 
 let isPinching = false;           
@@ -159,40 +160,35 @@ function resizeCanvas() {
     redrawAllStrokes();
 }
 
-// --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
-
-// --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
-
-// --- app.js ---
-// Koordinatları Düzeltme Fonksiyonu
-// --- app.js ---
-
+// --- KOORDİNAT HESAPLAMA (ZIPLAMA ÖNLEYİCİ VERSİYON) ---
 function getEventPosition(e) {
-    // İlk açılışta hesaplama yapılmamışsa yap
-    if (!canvasRect) {
-        updateCanvasRect();
-    }
+    // Canvas konumunu güncelle (Kayma olmaması için)
+    if (!canvasRect) updateCanvasRect();
 
     let clientX, clientY;
 
+    // 1. Dokunmatik olay mı?
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
+    } 
+    // 2. Parmak kalkış olayı mı? (Touchend - Zıplamayı çözen kısım burası)
+    else if (e.changedTouches && e.changedTouches.length > 0) {
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
-    } else {
+    } 
+    // 3. Mouse olayı mı?
+    else {
         clientX = e.clientX;
         clientY = e.clientY;
     }
 
-    // HAFIZADAN OKUYARAK HIZLI HESAPLAMA
+    // Hassas hesaplama
     return { 
         x: (clientX - canvasRect.left) * scaleX, 
         y: (clientY - canvasRect.top) * scaleY 
     };
-}
-function drawDot(pos, color = '#00FFCC') {
+}function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
     ctx.fillStyle = color;
@@ -948,6 +944,7 @@ window.currentLineColor = lineColorOptions[0].dataset.color || lineColorOptions[
 // --- app.js içindeki canvas.addEventListener('mousedown', ...) bloğunu TAMAMEN bununla değiştir ---
 
 canvas.addEventListener('mousedown', (e) => {
+    if (isTouchActive) return;
 
     // --- 1. FİZİKSEL ARAÇ KONTROLÜ ---
     const isToolElementClicked = e.target.closest('.ruler-container, .gonye-container, .aciolcer-container, #compass-container');
@@ -1107,7 +1104,10 @@ canvas.addEventListener('mousedown', (e) => {
             break;
     }
 });
+
+
 canvas.addEventListener('mousemove', (e) => {
+    if (isTouchActive) return;
 
     // 'move' modu mantığı 'mousemove' İÇİNE TAŞINDI
     if (currentTool === 'move' && isMoving) {
@@ -1500,22 +1500,29 @@ canvas.addEventListener('mouseup', () => {
     snapHoverTimer = null;
 });
 
-// --- DOKUNMATİK OLAYLARI (TOUCH) ---
-
-// --- DOKUNMATİK BAŞLANGIÇ (TOUCHSTART) ---
+// --- DOKUNMATİK BAŞLANGIÇ (TOUCHSTART - GÜNCELLENMİŞ) ---
 canvas.addEventListener('touchstart', (e) => {
+    isTouchActive = true; // Dokunmatik moda geç, mouse'u kilitle
     if (e.touches.length === 1) e.preventDefault();
     
-    // --- YENİ EKLENEN KISIM: MENÜLERİ GİZLE ---
+    // Menüleri gizle
     if (penOptions) penOptions.classList.add('hidden');
     if (lineOptions) lineOptions.classList.add('hidden');
     if (polygonOptions) polygonOptions.classList.add('hidden');
     if (oyunlarOptions) oyunlarOptions.classList.add('hidden');
     if (fillOptions) fillOptions.classList.add('hidden'); 
-    const pos = getEventPosition(e);
-    const snapPos = snapTarget || pos;
-    currentMousePos = pos; 
 
+    // Koordinatı al ve global değişkene ata
+    const pos = getEventPosition(e);
+    currentMousePos = pos; 
+    
+    // 1. Fiziksel Araç Kontrolü (Cetvel vb. üzerindeyse çizimi başlatma)
+    // Eğer parmak bir aracın üzerindeyse, canvas çizimini engelle
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (target && target.closest('.ruler-container, .gonye-container, .aciolcer-container, #compass-container')) {
+        return; 
+    }
 
 
     // 1. Taşıma (Move) ve Bilgi Gösterme
@@ -1893,36 +1900,51 @@ if (currentTool === 'move' && isMoving) {
     }
 });
 
-canvas.addEventListener('touchend', () => {
+// --- DOKUNMATİK BİTİŞ (TOUCHEND - ZIPLAMA ÇÖZÜMLÜ + PINCH DESTEKLİ) ---
+canvas.addEventListener('touchend', (e) => {
+    // 1. Mouse kilidini hemen açma (Hayalet tıklama önleyici)
+    setTimeout(() => { isTouchActive = false; }, 500);
 
-if (isPinching) {
-    isPinching = false;
-    isMoving = false; // Zoom bitince taşıma da bitsin
+    // 2. PARMAK KALKTIĞI ANDAKİ SON KOORDİNATI AL (ZIPLAMA FİKSİ)
+    // getEventPosition fonksiyonunu changedTouches ile güncellediysen burası doğru çalışır.
+    const pos = getEventPosition(e);
+    currentMousePos = pos;
 
-    // Güncel boyutları kaydet (Aksi halde bir sonraki taşıma bozulur)
-    selectedItem.originalWidth = selectedItem.width;
-    selectedItem.originalHeight = selectedItem.height;
+    // 3. Pinch (Zoom) Kontrolü (Senin Kodun)
+    if (isPinching) {
+        isPinching = false;
+        isMoving = false; // Zoom bitince taşıma da bitsin
 
-    redrawAllStrokes();
-    return;
-}
-// ... (Mevcut diğer touchend mantığı devam eder)
+        // Güncel boyutları kaydet
+        if(selectedItem) {
+            selectedItem.originalWidth = selectedItem.width;
+            selectedItem.originalHeight = selectedItem.height;
+        }
+
+        redrawAllStrokes();
+        return;
+    }
+
+    // 4. Araç Kontrolleri (Cetvel vb. açıksa çizim yapma)
     if (currentTool === 'ruler' || currentTool === 'gonye' || currentTool === 'aciolcer' || currentTool === 'pergel') return;
 
-    // 1. Taşıma Durdur
+    // 5. Taşıma Durdur
     if (currentTool === 'move' && isMoving) {
         if (window.audio_eraser) { window.audio_eraser.pause(); window.audio_eraser.currentTime = 0; }
         isMoving = false; selectedPointKey = null; rotationPivot = null; originalStartPos = {};
-        return; 
+        return;
     }
 
-    // 2. Silgi Temizle
+    // 6. Silgi Temizle
     if (currentTool === 'eraser') {
         if (isDrawing && window.audio_eraser) { window.audio_eraser.pause(); window.audio_eraser.currentTime = 0; }
-        isDrawing = false; setActiveTool('none'); return; 
+        isDrawing = false; setActiveTool('none'); return;
     }
 
-    const endPos = snapTarget || currentMousePos;
+    // 7. Bitiş Noktası (Snap varsa ona yapış, yoksa son parmak konumunu al)
+    // Zıplamayı engelleyen kısım buradaki 'pos' kullanımıdır.
+    const snapTargetFix = findSnapPoint(pos);
+    const endPos = snapTargetFix || pos;
 
     // --- ÇİZGİLERİ KAYDET ---
     if (isDrawingLine && lineStartPoint) {
@@ -1931,10 +1953,10 @@ if (isPinching) {
         isDrawingLine = false; lineStartPoint = null; redrawAllStrokes();
     }
     else if (isDrawingInfinityLine && lineStartPoint) {
-        try { if (window.audio_draw) { window.audio_draw.pause(); window.audio_draw.currentTime = 0; } } catch(e){}
-        const label1 = nextPointChar; const label2 = advanceChar(label1); nextPointChar = advanceChar(label2);
-        drawnStrokes.push({ type: 'line', p1: lineStartPoint, p2: endPos, color: currentLineColor, width: 3, label1: label1, label2: label2 });
-        isDrawingInfinityLine = false; lineStartPoint = null; redrawAllStrokes();
+         try { if (window.audio_draw) { window.audio_draw.pause(); window.audio_draw.currentTime = 0; } } catch(e){}
+         const label1 = nextPointChar; const label2 = advanceChar(label1); nextPointChar = advanceChar(label2);
+         drawnStrokes.push({ type: 'line', p1: lineStartPoint, p2: endPos, color: currentLineColor, width: 3, label1: label1, label2: label2 });
+         isDrawingInfinityLine = false; lineStartPoint = null; redrawAllStrokes();
     }
     else if (isDrawingSegment && lineStartPoint) {
         try { if (window.audio_draw) { window.audio_draw.pause(); window.audio_draw.currentTime = 0; } } catch(e){}
@@ -1952,20 +1974,21 @@ if (isPinching) {
     // --- ÇOKGENLERİ KAYDET ---
     else if (currentTool.startsWith('draw_polygon_')) {
         if (window.tempPolygonData && window.tempPolygonData.center) {
-            const finalRadius = window.tempPolygonData.radius || 0;
-            const finalRotation = window.tempPolygonData.rotation || 0;
             
+            // Zıplamayı önlemek için yarıçapı SON KEZ hesapla
+            const finalRadius = distance(window.tempPolygonData.center, endPos);
+            const finalRotation = window.tempPolygonData.rotation || 0;
+
             if (window.tempPolygonData.type === 0) window.PolygonTool.finalizeCircle(finalRadius);
             else window.PolygonTool.finalizeDraw(finalRadius, finalRotation);
-            
+
             polygonPreviewLabel.classList.add('hidden');
-            setActiveTool('none'); 
+            setActiveTool('none');
         }
     }
 
     isDrawing = false; snapTarget = null; snapIndicator.style.display = 'none';
 });
-
 // --- YAPIŞTIRMA (PASTE) DESTEĞİ (CTRL+V) ---
 window.addEventListener('paste', (e) => {
     // Panodaki verileri al
