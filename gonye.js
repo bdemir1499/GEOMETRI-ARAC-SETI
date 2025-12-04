@@ -188,13 +188,18 @@ window.GonyeTool.addListeners = function() {
 };
 
 // Olaydan X/Y pozisyonunu al (Mouse veya Touch)
+// --- gonye.js içindeki window.GonyeTool.getEventPos fonksiyonunu bununla değiştirin ---
+
+// Olaydan X/Y pozisyonunu al (Mouse veya Touch - Mobil Uyumlu)
 window.GonyeTool.getEventPos = function(e) {
-    if (e.touches) {
-        if (e.touches.length > 0) {
-            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }
-        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    // Dokunmatik cihazlar için kontrol (Hem touches hem changedTouches kontrolü)
+    if (e.touches || e.changedTouches) {
+        // touches[0] varsa (parmak ekrandaysa) onu al
+        // Yoksa changedTouches[0] al (parmak kaldırıldığında)
+        const touch = e.touches[0] || e.changedTouches[0];
+        return { x: touch.clientX, y: touch.clientY };
     }
+    // Mouse olayı ise
     return { x: e.clientX, y: e.clientY };
 };
 
