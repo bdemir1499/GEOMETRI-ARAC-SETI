@@ -711,15 +711,20 @@ html, body {
     display: none !important;
 }
 
-/* --- INSTAGRAM / WEBVIEW DÜZELTMESİ --- */
+/* --- INSTAGRAM / WEBVIEW KESİN ÇÖZÜM --- */
 canvas {
-    touch-action: none !important; /* Tarayıcıya "burada kaydırma yapma" der */
-    user-select: none; /* Seçim yapmayı engeller */
-    -webkit-user-select: none; /* Safari/iOS için seçim engeli */
-    -webkit-touch-callout: none; /* iOS uzun basınca menü açılmasını engeller */
+    touch-action: none !important; 
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    outline: none !important;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 
-body {
-    overscroll-behavior: none; /* Sayfanın yaylanmasını (bounce) engeller */
-    overflow: hidden; /* Taşmaları gizler */
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Sayfa asla kaymaz */
+    position: fixed; /* Ekranı kilitler */
+    touch-action: none;
 }
