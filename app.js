@@ -160,35 +160,42 @@ function resizeCanvas() {
     redrawAllStrokes();
 }
 
-// --- KOORDİNAT HESAPLAMA (ZIPLAMA ÖNLEYİCİ VERSİYON) ---
+// --- app.js (GÜÇLENDİRİLMİŞ KOORDİNAT FONKSİYONU) ---
 function getEventPosition(e) {
-    // Canvas konumunu güncelle (Kayma olmaması için)
-    if (!canvasRect) updateCanvasRect();
+    // Canvas konumunu her seferinde güncelle (Kaymaları önler)
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
     let clientX, clientY;
 
-    // 1. Dokunmatik olay mı?
+    // 1. Dokunma devam ediyorsa (touchstart, touchmove)
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
     } 
-    // 2. Parmak kalkış olayı mı? (Touchend - Zıplamayı çözen kısım burası)
+    // 2. Dokunma bittiyse (touchend) - EN KRİTİK NOKTA BURASI
     else if (e.changedTouches && e.changedTouches.length > 0) {
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
     } 
-    // 3. Mouse olayı mı?
-    else {
+    // 3. Mouse olayıysa
+    else if (e.clientX !== undefined) {
         clientX = e.clientX;
         clientY = e.clientY;
     }
+    // 4. Hiçbir veri yoksa (Hata durumu), son bilinen konumu kullan
+    else {
+        return currentMousePos || { x: 0, y: 0 };
+    }
 
-    // Hassas hesaplama
     return { 
-        x: (clientX - canvasRect.left) * scaleX, 
-        y: (clientY - canvasRect.top) * scaleY 
+        x: (clientX - rect.left) * scaleX, 
+        y: (clientY - rect.top) * scaleY 
     };
-}function drawDot(pos, color = '#00FFCC') {
+}
+
+function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
     ctx.fillStyle = color;
