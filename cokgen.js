@@ -69,7 +69,8 @@ window.PolygonTool = {
         };
     },
     
-    // Çizimi tamamlar ve app.js'e kaydeder (Çember ve Düzgün Çokgenler için 2. Tıklama)
+    // --- cokgen.js içindeki finalizeDraw fonksiyonunu bununla değiştirin ---
+
     finalizeDraw: function(radius, rotation) { 
         if (!window.tempPolygonData) return;
         
@@ -82,12 +83,11 @@ window.PolygonTool = {
              return; 
         }
 
-        const mainCanvas = document.querySelector('canvas');
-        const rect = mainCanvas.getBoundingClientRect();
-        
+        // DÜZELTME: app.js artık 'rect' farkını düşülmüş (doğru) koordinat gönderiyor.
+        // Bu yüzden burada tekrar 'rect.left' çıkarmıyoruz. Doğrudan 'center' kullanıyoruz.
         const centerOnCanvas = {
-            x: center.x - rect.left,
-            y: center.y - rect.top
+            x: center.x, 
+            y: center.y
         };
         
         if (window.drawnStrokes && window.redrawAllStrokes) {
@@ -102,8 +102,8 @@ window.PolygonTool = {
                 center: centerOnCanvas,
                 radius: radius, 
                 rotation: rotation, 
-                color: window.currentLineColor, // <-- KRİTİK EKLENTİ (Renk)
-                width: 3, // <-- KRİTİK EKLENTİ (Kalınlık)
+                color: window.currentLineColor,
+                width: 3, 
                 fillColor: 'rgba(0, 0, 0, 0.2)', 
                 label: centerLabel
             });
@@ -115,24 +115,22 @@ window.PolygonTool = {
         window.tempPolygonData = null;
     },
     
-    // Çember çizimini tamamlar (2. Tıklama)
+    // --- finalizeCircle fonksiyonunu da aynı mantıkla güncelleyin ---
+
     finalizeCircle: function(radius) { 
         if (!window.tempPolygonData) return;
         
         const center = window.tempPolygonData.center;
 
         if (radius < 5) {
-             
              window.tempPolygonData = null;
              return; 
         }
 
-        const mainCanvas = document.querySelector('canvas');
-        const rect = mainCanvas.getBoundingClientRect();
-        
+        // DÜZELTME: Burada da 'rect' çıkarma işlemini kaldırdık.
         const centerOnCanvas = {
-            x: center.x - rect.left,
-            y: center.y - rect.top
+            x: center.x,
+            y: center.y
         };
         
         if (window.drawnStrokes && window.redrawAllStrokes) {
@@ -146,8 +144,8 @@ window.PolygonTool = {
                 radius: radius, 
                 startAngle: 0,
                 endAngle: 359.99, 
-                color: window.currentLineColor, // <-- KRİTİK EKLENTİ (Renk)
-                width: 3, // <-- KRİTİK EKLENTİ (Kalınlık)
+                color: window.currentLineColor,
+                width: 3,
                 label: centerLabel
             });
             
