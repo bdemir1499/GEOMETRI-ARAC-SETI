@@ -1,4 +1,4 @@
-// --- app.js (TAM DÜZELTİLMİŞ SÜRÜM) ---
+// --- app.js (TEMİZLENMİŞ BAŞLANGIÇ) ---
 
 // --- SESLER ---
 window.audio_click = new Audio('sesler/point-smooth-beep-230573.mp3');
@@ -6,8 +6,6 @@ let audio_click_src_set = false;
 window.audio_undo = new Audio('sesler/080918_bolt-sliding-back-4-39863 (3).mp3');
 window.audio_draw = new Audio('sesler/drawing-a-line-69277.mp3'); 
 window.audio_eraser = new Audio('sesler/pencil-eraser-107852.mp3');
-
-// --- app.js (EN ÜST KISIMLARA EKLE) ---
 
 // PERFORMANS İÇİN ÖNBELLEK DEĞİŞKENLERİ
 let canvasRect = null;
@@ -17,39 +15,25 @@ let scaleY = 1;
 // --- KANVAS AYARLARI ---
 const canvas = document.getElementById('drawing-canvas');
 const ctx = canvas.getContext('2d', { 
-    desynchronized: true, // Android'de gecikmeyi kaldırır (Sihirli kod)
-    alpha: false          // Saydamlık hesaplamasını kapatır (Hızlandırır)
+    desynchronized: true, // Tablet performansı için
+    alpha: false          
 }); 
 
-// --- BURAYA YAPIŞTIRIN ---
-// PERFORMANS İÇİN ÖNBELLEK DEĞİŞKENLERİ
-let canvasRect = null;
-let scaleX = 1;
-let scaleY = 1;
-
 // --- RESİM YÜKLEME DEĞİŞKENLERİ ---
-let backgroundImage = null; // Yüklenen resmi tutacak değişken
+let backgroundImage = null; 
 const uploadButton = document.getElementById('btn-upload');
 const fileInput = document.getElementById('file-input');
-
-// --- app.js (DÜZELTİLMİŞ BAŞLANGIÇ BÖLÜMÜ) ---
-
-// --- SESLER ---
-window.audio_click = new Audio('sesler/point-smooth-beep-230573.mp3'); 
-window.audio_undo = new Audio('sesler/080918_bolt-sliding-back-4-39863 (3).mp3');
-window.audio_draw = new Audio('sesler/drawing-a-line-69277.mp3'); 
-window.audio_eraser = new Audio('sesler/pencil-eraser-107852.mp3');
 
 // --- DEĞİŞKENLER ---
 let isDrawing = false; 
 let currentTool = 'none'; 
-let isPinching = false;           // İki parmakla yakınlaştırma aktif mi?
-let initialDistance = 0;          // Başlangıç parmak mesafesi (zoom için)
-let initialScale = 0;             // Başlangıçta seçili nesnenin genişliği
-let initialCenter = { x: 0, y: 0 }; // İki parmağın merkez noktası (pan için)
+let isPinching = false;           
+let initialDistance = 0;          
+let initialScale = 0;             
+let initialCenter = { x: 0, y: 0 }; 
 let currentPenColor = '#FFFFFF'; 
 let currentPenWidth = 4;
-window.currentLineColor = '#FFFFFF'; // Varsayılan Renk: BEYAZ
+window.currentLineColor = '#FFFFFF'; 
 const SNAP_THRESHOLD = 10; 
 
 let drawnStrokes = []; 
@@ -74,11 +58,13 @@ let selectedPointKey = null;
 let rotationPivot = null;     
 let dragStartPos = { x: 0, y: 0 }; 
 let originalStartPos = {};
-let currentPDF = null;       // Yüklenen PDF dosyası
-let currentPDFPage = 1;      // Şu anki sayfa
-let totalPDFPages = 0;       // Toplam sayfa
-let pdfImageStroke = null;   // Ekrana çizilen PDF sayfası
+let currentPDF = null;       
+let currentPDFPage = 1;      
+let totalPDFPages = 0;       
+let pdfImageStroke = null;   
 
+// --------------------------------------------------------
+// BURADAN SONRA "HTML ELEMENTLERİ" BÖLÜMÜ GELECEK...
 // --- HTML ELEMENTLERİ ---
 const body = document.body;
 // Diğer const tanımlarının yanına ekle
@@ -2211,6 +2197,53 @@ function resizeCanvas() {
         redrawAllStrokes();
     }
 }
+
+// --- TABLET UYUMLULUK YAMASI (APP.JS EN ALTINA EKLE) ---
+// Bu kod, mevcut tıklama olaylarını bozmadan tablet dokunuşlarını algılar.
+
+function makeTabletFriendly() {
+    // 1. Düzeltilecek tüm butonları listele
+    const buttonsToFix = [
+        penButton, eraserButton, lineButton, rulerButton, gonyeButton, 
+        aciolcerButton, pergelButton, polygonButton, oyunlarButton,
+        undoButton, clearAllButton, moveButton, fillButton,
+        pointButton, straightLineButton, infinityLineButton, segmentButton, rayButton,
+        circleButton, toolColorBtn, uploadButton, closePdfButton, prevPageBtn, nextPageBtn
+    ];
+
+    // 2. Renk kutularını ve çokgen butonlarını da listeye ekle
+    if (typeof regularPolygonButtons !== 'undefined') buttonsToFix.push(...regularPolygonButtons);
+    if (typeof colorBoxes !== 'undefined') buttonsToFix.push(...colorBoxes);
+    if (typeof lineColorOptions !== 'undefined') buttonsToFix.push(...lineColorOptions);
+    if (typeof polygonColorOptions !== 'undefined') buttonsToFix.push(...polygonColorOptions);
+    if (typeof fillColorBoxes !== 'undefined') buttonsToFix.push(...fillColorBoxes);
+
+    // 3. Her bir butona "Dokunursam Tıkla" özelliği ekle
+    buttonsToFix.forEach(btn => {
+        if (!btn) return; // Eğer buton o an sayfada yoksa hata verme, geç.
+
+        // Daha önce olay eklenmiş mi kontrol et (üst üste binmesin)
+        if (btn.getAttribute('data-touch-fixed') === 'true') return;
+
+        btn.addEventListener('touchstart', function(e) {
+            // Tablette dokunulduğunda:
+            if (e.cancelable) e.preventDefault(); // 1. Ekranın kaymasını/büyümesini engelle
+            e.stopPropagation(); // 2. Arkadaki kanvasa çizim yapmasını engelle
+            
+            // 3. Butona tıklanmış gibi yap (Mevcut kodunu çalıştırır)
+            this.click(); 
+        }, { passive: false });
+
+        // İşaretle ki tekrar eklemeyelim
+        btn.setAttribute('data-touch-fixed', 'true');
+    });
+}
+
+// Sayfa yüklendiğinde yamayı çalıştır
+document.addEventListener('DOMContentLoaded', makeTabletFriendly);
+
+// Garanti olsun diye hemen de çalıştır (bazen DOMContentLoaded kaçabilir)
+makeTabletFriendly();
 
 // Olay Dinleyicileri (Sayfa yüklenince, boyut değişince, kaydırılınca)
 window.addEventListener('load', resizeCanvas);
