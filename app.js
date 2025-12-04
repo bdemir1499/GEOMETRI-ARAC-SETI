@@ -156,16 +156,32 @@ function resizeCanvas() {
     redrawAllStrokes();
 }
 
+// --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
+
 function getEventPosition(e) {
-    // Eğer dokunmatik olay ise
-    if (e.touches || e.changedTouches) {
-        // touches[0] varsa onu al (touchstart, touchmove)
-        // Yoksa changedTouches[0] al (touchend)
-        const touch = e.touches[0] || e.changedTouches[0];
-        return { x: touch.clientX, y: touch.clientY };
+    // Kanvasın sayfadaki tam konumunu al
+    const rect = canvas.getBoundingClientRect();
+    
+    let clientX, clientY;
+
+    // Dokunmatik veya Mouse ayrımı
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
     }
-    // Mouse olayı ise
-    return { x: e.clientX, y: e.clientY };
+
+    // Ekran koordinatından kanvasın kenar boşluğunu çıkararak
+    // tam olarak kanvas içindeki "gerçek" noktayı bul
+    return { 
+        x: clientX - rect.left, 
+        y: clientY - rect.top 
+    };
 }
 function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
