@@ -189,14 +189,12 @@ window.RulerTool = {
 
     // Olaydan X/Y pozisyonunu al (Mouse veya Touch)
     getEventPos: function(e) {
-        if (e.touches) {
-            if (e.touches.length > 0) {
-                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            }
-            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-        }
-        return { x: e.clientX, y: e.clientY };
-    },
+    if (e.touches || e.changedTouches) {
+        const touch = e.touches[0] || e.changedTouches[0];
+        return { x: touch.clientX, y: touch.clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+},
 
     // MOUSE/TOUCH BAŞLANGICI (DÜZELTME: Güvenli Merkezden Dönme)
     onMouseDown: function(e) {
