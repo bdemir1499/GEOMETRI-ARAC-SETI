@@ -2251,6 +2251,22 @@ function makeTabletFriendly() {
     });
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('drawing-canvas');
+    
+    // 1. Dokunma hareketini, tarayıcı daha algılamadan durdur
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault(); // "Sayfayı kaydırma!" emri
+    }, { passive: false }); // 'passive: false' bu emrin kesin olduğunu belirtir
+
+    // 2. Dokunma başlangıcını da koru
+    canvas.addEventListener('touchstart', function(e) {
+        if (e.target === canvas) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+}, { passive: false });
+
 // Sayfa yüklendiğinde yamayı çalıştır
 document.addEventListener('DOMContentLoaded', makeTabletFriendly);
 
