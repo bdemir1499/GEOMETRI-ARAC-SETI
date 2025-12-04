@@ -710,3 +710,16 @@ html, body {
 .hidden {
     display: none !important;
 }
+
+/* --- INSTAGRAM / WEBVIEW DÜZELTMESİ --- */
+canvas {
+    touch-action: none !important; /* Tarayıcıya "burada kaydırma yapma" der */
+    user-select: none; /* Seçim yapmayı engeller */
+    -webkit-user-select: none; /* Safari/iOS için seçim engeli */
+    -webkit-touch-callout: none; /* iOS uzun basınca menü açılmasını engeller */
+}
+
+body {
+    overscroll-behavior: none; /* Sayfanın yaylanmasını (bounce) engeller */
+    overflow: hidden; /* Taşmaları gizler */
+}
