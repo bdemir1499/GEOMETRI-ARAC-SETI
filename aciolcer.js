@@ -218,9 +218,18 @@ const resize = this.resizeHandle;
         window.addEventListener('touchend', this.onUp.bind(this));
     },
 
-    getPos: function(e) {
-        return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
-    },
+    // --- aciolcer.js içindeki getPos fonksiyonunu bununla değiştirin ---
+
+getPos: function(e) {
+    // Dokunmatik ekran kontrolü (Android/iOS uyumu için)
+    if (e.touches || e.changedTouches) {
+        // Parmağın ekranda olduğu (touches) veya kalktığı (changedTouches) anı yakala
+        const touch = e.touches[0] || e.changedTouches[0];
+        return { x: touch.clientX, y: touch.clientY };
+    }
+    // Mouse olayı ise
+    return { x: e.clientX, y: e.clientY };
+},
 
     // --- 5. ETKİLEŞİM MANTIĞI ---
     
