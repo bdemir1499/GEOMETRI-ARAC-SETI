@@ -7,9 +7,26 @@ window.audio_undo = new Audio('sesler/080918_bolt-sliding-back-4-39863 (3).mp3')
 window.audio_draw = new Audio('sesler/drawing-a-line-69277.mp3'); 
 window.audio_eraser = new Audio('sesler/pencil-eraser-107852.mp3');
 
+// --- app.js (EN ÜST KISIMLARA EKLE) ---
+
+// PERFORMANS İÇİN ÖNBELLEK DEĞİŞKENLERİ
+let canvasRect = null;
+let scaleX = 1;
+let scaleY = 1;
+
 // --- KANVAS AYARLARI ---
 const canvas = document.getElementById('drawing-canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { 
+    desynchronized: true, // Android'de gecikmeyi kaldırır (Sihirli kod)
+    alpha: false          // Saydamlık hesaplamasını kapatır (Hızlandırır)
+}); 
+
+// --- BURAYA YAPIŞTIRIN ---
+// PERFORMANS İÇİN ÖNBELLEK DEĞİŞKENLERİ
+let canvasRect = null;
+let scaleX = 1;
+let scaleY = 1;
+
 // --- RESİM YÜKLEME DEĞİŞKENLERİ ---
 let backgroundImage = null; // Yüklenen resmi tutacak değişken
 const uploadButton = document.getElementById('btn-upload');
@@ -165,16 +182,13 @@ function resizeCanvas() {
 // --- app.js ---
 
 function getEventPosition(e) {
-    const rect = canvas.getBoundingClientRect();
-    
-    // 1. Ekran ile Canvas arasındaki ölçek farkını hesapla
-    // (Bu kısım tabletlerdeki kaymayı çözen sihirli kısımdır)
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    // İlk açılışta hesaplama yapılmamışsa yap
+    if (!canvasRect) {
+        updateCanvasRect();
+    }
 
     let clientX, clientY;
 
-    // 2. Dokunmatik veya Mouse koordinatını al
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
@@ -186,13 +200,12 @@ function getEventPosition(e) {
         clientY = e.clientY;
     }
 
-    // 3. Hesaplama: (Tıklanan Yer - Kenar Boşluğu) * Ölçek
+    // HAFIZADAN OKUYARAK HIZLI HESAPLAMA
     return { 
-        x: (clientX - rect.left) * scaleX, 
-        y: (clientY - rect.top) * scaleY 
+        x: (clientX - canvasRect.left) * scaleX, 
+        y: (clientY - canvasRect.top) * scaleY 
     };
 }
-
 function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
@@ -2174,20 +2187,32 @@ if (closePdfButton) {
     });
 }
 
+// --- app.js (EN ALT SATIRA YAPIŞTIRIN) ---
+
+function updateCanvasRect() {
+    // Kanvasın ekrandaki konumunu ve boyutunu hesapla
+    canvasRect = canvas.getBoundingClientRect();
+    
+    // Ekran çözünürlüğü ile kanvas çözünürlüğü arasındaki oranı bul
+    scaleX = canvas.width / canvasRect.width;
+    scaleY = canvas.height / canvasRect.height;
+}
+
 function resizeCanvas() {
-    // Mevcut çizimi kaybetmemek için geçici olarak kaydetmek istersen buraya ek kod gerekir
-    // Ama şimdilik sadece boyutu düzeltiyoruz:
+    // Kanvası ekran boyutuna eşitle
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
-    // Eğer bir arka plan resmi varsa veya çizimler varsa, 
-    // canvas boyutu değişince silinirler. Onları tekrar çizdirmek için:
+    // Boyut değişince hesaplamayı güncelle
+    updateCanvasRect();
+    
+    // Eğer çizim fonksiyonu varsa, ekran temizlenmesin diye tekrar çiz
     if (typeof redrawAllStrokes === 'function') {
         redrawAllStrokes();
     }
 }
 
-// --- BAŞLANGIÇ ---
+// Olay Dinleyicileri (Sayfa yüklenince, boyut değişince, kaydırılınca)
 window.addEventListener('load', resizeCanvas);
-
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('scroll', updateCanvasRect);
