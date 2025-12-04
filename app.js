@@ -158,8 +158,10 @@ function resizeCanvas() {
 
 // --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
 
+// --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
+
 function getEventPosition(e) {
-    // Kanvasın sayfadaki tam konumunu al
+    // Kanvasın sayfadaki tam konumunu ve kenar boşluklarını al
     const rect = canvas.getBoundingClientRect();
     
     let clientX, clientY;
@@ -169,6 +171,7 @@ function getEventPosition(e) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
     } else if (e.changedTouches && e.changedTouches.length > 0) {
+        // 'touchend' olayı için changedTouches kullanılır
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
     } else {
@@ -176,14 +179,13 @@ function getEventPosition(e) {
         clientY = e.clientY;
     }
 
-    // Ekran koordinatından kanvasın kenar boşluğunu çıkararak
-    // tam olarak kanvas içindeki "gerçek" noktayı bul
+    // Ekran koordinatından kanvasın konumunu çıkararak
+    // tam olarak kanvasın içindeki "yerel" noktayı bul
     return { 
         x: clientX - rect.left, 
         y: clientY - rect.top 
     };
-}
-function drawDot(pos, color = '#00FFCC') {
+}function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
     ctx.fillStyle = color;
