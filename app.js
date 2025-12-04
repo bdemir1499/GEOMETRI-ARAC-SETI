@@ -160,32 +160,39 @@ function resizeCanvas() {
 
 // --- app.js içindeki getEventPosition fonksiyonu (DÜZELTİLMİŞ HALİ) ---
 
+// --- app.js ---
+// Koordinatları Düzeltme Fonksiyonu
 function getEventPosition(e) {
-    // Kanvasın sayfadaki tam konumunu ve kenar boşluklarını al
+    // Kanvasın sayfadaki konumunu al
     const rect = canvas.getBoundingClientRect();
     
     let clientX, clientY;
 
-    // Dokunmatik veya Mouse ayrımı
+    // 1. Dokunmatik Olayı (Parmağın anlık konumu)
     if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-        // 'touchend' olayı için changedTouches kullanılır
+    } 
+    // 2. Dokunma Bitişi (Parmağın kalktığı yer)
+    else if (e.changedTouches && e.changedTouches.length > 0) {
         clientX = e.changedTouches[0].clientX;
         clientY = e.changedTouches[0].clientY;
-    } else {
+    } 
+    // 3. Mouse Olayı
+    else {
         clientX = e.clientX;
         clientY = e.clientY;
     }
 
-    // Ekran koordinatından kanvasın konumunu çıkararak
-    // tam olarak kanvasın içindeki "yerel" noktayı bul
+    // Ekran koordinatından kanvasın kenar boşluğunu çıkar
+    // Bu işlem, çizimin tam parmak ucunda oluşmasını sağlar
     return { 
         x: clientX - rect.left, 
         y: clientY - rect.top 
     };
-}function drawDot(pos, color = '#00FFCC') {
+}
+
+function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
     ctx.fillStyle = color;
@@ -452,75 +459,96 @@ function clearAllStrokes() {
     
     redrawAllStrokes();
 }
+
+// --- app.js ---
+// Tıklanan Nesneyi Bulma Fonksiyonu
 function findHit(pos) {
+    // Dokunmatik için hassasiyet alanı (20px)
+    const HIT_THRESHOLD = 20;
+
     for (let i = drawnStrokes.length - 1; i >= 0; i--) {
         const stroke = drawnStrokes[i];
 
-if (stroke.type === 'image') {
-            // 1. Önce Boyutlandırma Tutamacı (Sağ Alt Köşe)
-            // Köşenin dünya koordinatlarını hesapla
+        // 1. Resim Kontrolleri (Boyutlandırma ve Taşıma)
+        if (stroke.type === 'image') {
             const halfW = stroke.width / 2;
             const halfH = stroke.height / 2;
-            const cornerX = stroke.x + halfW; // Basit hesap (Döndürme yoksa)
+            const cornerX = stroke.x + halfW;
             const cornerY = stroke.y + halfH;
             
-            if (distance(pos, {x: cornerX, y: cornerY}) < 20) {
+            if (distance(pos, {x: cornerX, y: cornerY}) < 35) {
                 return { item: stroke, pointKey: 'image_resize' };
             }
-
-            // 2. Resmin Gövdesi (Taşıma İçin)
-            // Basit bir dikdörtgen çarpışma testi
             if (pos.x > stroke.x - halfW && pos.x < stroke.x + halfW &&
                 pos.y > stroke.y - halfH && pos.y < stroke.y + halfH) {
                 return { item: stroke, pointKey: 'self' };
             }
         }
 
+        // 2. Seçili Çokgen Tutamaçları (Döndürme/Büyütme)
         if (currentTool === 'move' && selectedItem === stroke) {
             if (stroke.type === 'polygon') {
-                const rotateHandlePos = 
-window.PolygonTool.getRotateHandlePosition(stroke);
-                if (distance(pos, rotateHandlePos) < 12) return { item: stroke, pointKey: 'rotate' }; 
+                const rotateHandlePos = window.PolygonTool.getRotateHandlePosition(stroke);
+                if (distance(pos, rotateHandlePos) < 30) return { item: stroke, pointKey: 'rotate' };
+                
                 if (stroke.vertices && stroke.vertices.length > 0) {
                     const resizeHandlePos = stroke.vertices[0];
-                    if (distance(pos, resizeHandlePos) < 10) return { item: stroke, pointKey: 'resize' }; 
+                    if (distance(pos, resizeHandlePos) < 30) return { item: stroke, pointKey: 'resize' };
                 }
             }
         }
+
+        // --- ÖNEMLİ DEĞİŞİKLİK: MERKEZ VE NOKTALAR ARTIK BURADA (ÜSTTE) ---
+        // Bu sayede kenar çizgileri yerine önce merkez algılanır.
         
-        if (currentTool === 'move' || currentTool === 'fill') { // Fill için de hit gerekli
+        // Nokta
+        if (stroke.type === 'point') {
+            if (distance(pos, stroke) < HIT_THRESHOLD) return { item: stroke, pointKey: 'self' };
+        }
+        
+        // Çizgi Uçları
+        if (stroke.p1 && distance(pos, stroke.p1) < HIT_THRESHOLD) return { item: stroke, pointKey: 'p1' };
+        if (stroke.p2 && distance(pos, stroke.p2) < HIT_THRESHOLD) return { item: stroke, pointKey: 'p2' };
+        
+        // Çember Merkezi
+        if (stroke.type === 'arc' && stroke.cx && distance(pos, {x: stroke.cx, y: stroke.cy}) < HIT_THRESHOLD) return { item: stroke, pointKey: 'center' };
+        
+        // Çokgen Merkezi (Taşıma İçin)
+        if (stroke.type === 'polygon' && stroke.center && distance(pos, stroke.center) < HIT_THRESHOLD) {
+             return { item: stroke, pointKey: 'center' };
+        }
+        // ------------------------------------------------------------
+
+        // 3. Bilgi Etiketleri (Kenar/Açı) - ARTIK EN SONDA
+        // Merkeze tıklanmadıysa buraya düşer ve bilgi açar.
+        if (currentTool === 'move' || currentTool === 'fill') {
             if (stroke.type === 'polygon' && stroke.vertices) {
+                // Köşeler
                 for (let j = 0; j < stroke.vertices.length; j++) {
-                    if (distance(pos, stroke.vertices[j]) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'toggle_angles' };
+                    if (distance(pos, stroke.vertices[j]) < HIT_THRESHOLD) return { item: stroke, pointKey: 'toggle_angles' };
                 }
+                // Kenarlar
                 for (let j = 0; j < stroke.vertices.length; j++) {
                     const v1 = stroke.vertices[j];
                     const v2 = stroke.vertices[(j + 1) % stroke.vertices.length];
                     const lineLength = distance(v1, v2);
-                    const steps = Math.max(1, Math.floor(lineLength / 5)); 
-                    let hitEdge = false;
-                    for (let step = 1; step < steps; step++) { 
+                    const steps = Math.max(1, Math.floor(lineLength / 10));
+                    for (let step = 0; step <= steps; step++) { 
                         const t = step / steps;
                         const sampleX = v1.x + (v2.x - v1.x) * t;
                         const sampleY = v1.y + (v2.y - v1.y) * t;
-                        if (distance({x: sampleX, y: sampleY}, pos) < SNAP_THRESHOLD) { hitEdge = true; break; }
+                        if (distance({x: sampleX, y: sampleY}, pos) < HIT_THRESHOLD) { 
+                            return { item: stroke, pointKey: 'toggle_edges' }; 
+                        }
                     }
-                    if (hitEdge) return { item: stroke, pointKey: 'toggle_edges' };
                 }
             }
+            // Çember Yayı
             if (stroke.type === 'arc' && stroke.cx) {
                 const distToCenter = distance(pos, {x: stroke.cx, y: stroke.cy});
-                if (Math.abs(distToCenter - stroke.radius) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'toggle_circle_info' };
+                if (Math.abs(distToCenter - stroke.radius) < HIT_THRESHOLD) return { item: stroke, pointKey: 'toggle_circle_info' };
             }
         }
-
-        if (stroke.type === 'point') {
-            if (distance(pos, stroke) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'self' };
-        }
-        if (stroke.p1 && distance(pos, stroke.p1) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'p1' };
-        if (stroke.p2 && distance(pos, stroke.p2) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'p2' };
-        if (stroke.type === 'arc' && stroke.cx && distance(pos, {x: stroke.cx, y: stroke.cy}) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'center' };
-        if (stroke.type === 'polygon' && stroke.center && distance(pos, stroke.center) < SNAP_THRESHOLD) return { item: stroke, pointKey: 'center' };
     }
     return null; 
 }
