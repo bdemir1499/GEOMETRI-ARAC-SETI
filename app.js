@@ -64,6 +64,8 @@ let pdfImageStroke = null;   // Ekrana çizilen PDF sayfası
 
 // --- HTML ELEMENTLERİ ---
 const body = document.body;
+// Diğer const tanımlarının yanına ekle
+const closePdfButton = document.getElementById('btn-close-pdf');
 
 // 1. Sol Panel Araçları
 const penButton = document.getElementById('btn-kalem');
@@ -155,12 +157,16 @@ function resizeCanvas() {
 }
 
 function getEventPosition(e) {
-    if (e.touches && e.touches.length > 0) {
-        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    // Eğer dokunmatik olay ise
+    if (e.touches || e.changedTouches) {
+        // touches[0] varsa onu al (touchstart, touchmove)
+        // Yoksa changedTouches[0] al (touchend)
+        const touch = e.touches[0] || e.changedTouches[0];
+        return { x: touch.clientX, y: touch.clientY };
     }
+    // Mouse olayı ise
     return { x: e.clientX, y: e.clientY };
 }
-
 function drawDot(pos, color = '#00FFCC') {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 5, 0, 2 * Math.PI); 
@@ -413,18 +419,21 @@ function undoLastStroke() {
 
 function clearAllStrokes() {
     if (drawnStrokes.length > 0) {
-        if (window.audio_clear) window.audio_clear.play(); // Varsa ses
+        if (window.audio_clear) window.audio_clear.play(); 
     }
-    drawnStrokes = [];
+    
+    // DEĞİŞİKLİK BURADA: Sadece 'image' OLMAYANLARI temizle.
+    // Yani tipi 'image' olanlar (kitap/resim) hafızada kalır.
+    drawnStrokes = drawnStrokes.filter(stroke => stroke.type === 'image');
+    
     window.drawnStrokes = drawnStrokes; 
     nextPointChar = 'A';
     window.nextPointChar = 'A';
     
-    backgroundImage = null; // <-- YENİ: Resmi hafızadan sil
+    // Not: backgroundImage değişkenini null yapmıyoruz artık.
     
     redrawAllStrokes();
 }
-
 function findHit(pos) {
     for (let i = drawnStrokes.length - 1; i >= 0; i--) {
         const stroke = drawnStrokes[i];
@@ -732,6 +741,10 @@ function addToCanvasAsObject(img) {
         height: startHeight,
         rotation: 0 
     });
+
+if (closePdfButton) {
+        closePdfButton.classList.remove('hidden');
+    }
     
     redrawAllStrokes();
 }
@@ -886,6 +899,8 @@ window.currentLineColor = lineColorOptions[0].dataset.color || lineColorOptions[
 
 // --- MOUSE OLAYLARI ---
 
+// --- app.js içindeki canvas.addEventListener('mousedown', ...) bloğunu TAMAMEN bununla değiştir ---
+
 canvas.addEventListener('mousedown', (e) => {
 
     // --- 1. FİZİKSEL ARAÇ KONTROLÜ ---
@@ -902,76 +917,52 @@ canvas.addEventListener('mousedown', (e) => {
     }
     // --- FİZİKSEL ARAÇ KONTROLÜ SONU ---
 
+    // --- YENİ EKLENEN KISIM: MENÜLERİ GİZLE ---
+    // Çizim alanına (boşluğa) tıklandığında açık olan tüm menüleri kapat
+    if (penOptions) penOptions.classList.add('hidden');
+    if (lineOptions) lineOptions.classList.add('hidden');
+    if (polygonOptions) polygonOptions.classList.add('hidden');
+    if (oyunlarOptions) oyunlarOptions.classList.add('hidden');
+    if (fillOptions) fillOptions.classList.add('hidden');
+    // ------------------------------------------
 
-    // --- 2. "TAŞI" MODU KONTROLÜ (GÜNCELLENDİ) ---
-    // app.js'deki 'mousedown' -> 'move' bloğunu DEĞİŞTİRİN:
-
-    // app.js'deki 'mousedown' -> 'move' bloğunu DEĞİŞTİRİN:
-
-    // app.js'deki 'mousedown' -> 'move' bloğunu DEĞİŞTİRİN:
-
+    // --- 2. "TAŞI" MODU KONTROLÜ ---
    if (currentTool === 'move') { // Taşıma Mantığı
         const pos = getEventPosition(e);
         const hit = findHit(pos);
         
         if (hit) { // Bir şey yakalandı
             
-            // --- KRİTİK ETİKETLEME DÜZELTMESİ ---
-            // (Artık diğer etiketleri kapatmıyoruz)
-            
-            if (hit.pointKey === 'toggle_edges') {
-                hit.item.showEdgeLabels = !hit.item.showEdgeLabels; // Sadece kenarı aç/kapat
-                redrawAllStrokes();
-                return; // Taşıma işlemini başlatma
-            }
-            if (hit.pointKey === 'toggle_angles') {
-                hit.item.showAngleLabels = !hit.item.showAngleLabels; // Sadece açıyı aç/kapat
-                redrawAllStrokes();
-                return; // Taşıma işlemini başlatma
-            }
-            if (hit.pointKey === 'toggle_circle_info') {
-                hit.item.showCircleInfo = !hit.item.showCircleInfo; // Sadece çember bilgisini aç/kapat
-                redrawAllStrokes();
-                return; // Taşıma işlemini başlatma
-            }
-            // --- ETİKETLEME MANTIĞI SONU ---
+            // Etiketleri Aç/Kapat
+            if (hit.pointKey === 'toggle_edges') { hit.item.showEdgeLabels = !hit.item.showEdgeLabels; redrawAllStrokes(); return; }
+            if (hit.pointKey === 'toggle_angles') { hit.item.showAngleLabels = !hit.item.showAngleLabels; redrawAllStrokes(); return; }
+            if (hit.pointKey === 'toggle_circle_info') { hit.item.showCircleInfo = !hit.item.showCircleInfo; redrawAllStrokes(); return; }
 
-            
-            // --- TAŞIMA/DÖNDÜRME/BOYUTLANDIRMA MANTIĞI ---
-            
-
+            // Taşıma Başlat
             isMoving = true;
             selectedItem = hit.item;
             selectedPointKey = hit.pointKey; 
             dragStartPos = pos; 
             
             originalStartPos = {}; 
-            if (hit.pointKey === 'self') {
-                originalStartPos = { x: hit.item.x, y: hit.item.y };
-            } else if (hit.pointKey === 'p1') {
-                originalStartPos = { x: hit.item.p1.x, y: hit.item.p1.y };
-            } else if (hit.pointKey === 'p2') {
-                originalStartPos = { x: hit.item.p2.x, y: hit.item.p2.y };
-            } else if (hit.pointKey === 'center') {
-                originalStartPos = { x: (hit.item.cx || hit.item.center.x), y: (hit.item.cy || hit.item.center.y) };
-            } else if (hit.pointKey === 'rotate' || hit.pointKey === 'resize') {
-                originalStartPos = { radius: hit.item.radius, rotation: hit.item.rotation };
-            }
+            if (hit.pointKey === 'self') originalStartPos = { x: hit.item.x, y: hit.item.y };
+            else if (hit.pointKey === 'p1') originalStartPos = { x: hit.item.p1.x, y: hit.item.p1.y };
+            else if (hit.pointKey === 'p2') originalStartPos = { x: hit.item.p2.x, y: hit.item.p2.y };
+            else if (hit.pointKey === 'center') originalStartPos = { x: (hit.item.cx || hit.item.center.x), y: (hit.item.cy || hit.item.center.y) };
+            else if (hit.pointKey === 'rotate' || hit.pointKey === 'resize') originalStartPos = { radius: hit.item.radius, rotation: hit.item.rotation };
             
             const itemType = hit.item.type;
             if ((itemType === 'line' || itemType === 'segment' || itemType === 'ray' || itemType === 'straightLine') && (hit.pointKey === 'p1' || hit.pointKey === 'p2')) {
                 rotationPivot = (hit.pointKey === 'p1') ? hit.item.p2 : hit.item.p1;
                 const movingPoint = (hit.pointKey === 'p1') ? hit.item.p1 : hit.item.p2;
                 selectedItem.startRadius = distance(movingPoint, rotationPivot);
-            } else {
-                rotationPivot = null; 
-            }
+            } else { rotationPivot = null; }
             
             redrawAllStrokes(); 
             return; 
             
         } else {
-             // Hiçbir şeye tıklanmadıysa, seçimi iptal et ve TÜM etiketleri kapat
+             // Hiçbir şeye tıklanmadıysa, seçimi iptal et
              if (selectedItem) {
                  selectedItem.showEdgeLabels = false;
                  selectedItem.showAngleLabels = false;
@@ -983,9 +974,7 @@ canvas.addEventListener('mousedown', (e) => {
     }
     // --- "TAŞI" MODU SONU ---
 
-
-    // --- 3. DİĞER ÇİZİM ARAÇLARI KONTROLÜ ---
-    
+    // --- 3. DİĞER ÇİZİM ARAÇLARI ---
     if (currentTool === 'none') return;
     
     const pos = getEventPosition(e);
@@ -998,10 +987,7 @@ canvas.addEventListener('mousedown', (e) => {
             break;
             
         case 'point':
-            if (window.audio_click) {
-                window.audio_click.currentTime = 0;
-                window.audio_click.play();
-            }
+            try { if (window.audio_click) { window.audio_click.currentTime = 0; window.audio_click.play(); } } catch(err){}
             isDrawing = false; 
             drawnStrokes.push({ type: 'point', x: snapPos.x, y: snapPos.y, label: nextPointChar });
             nextPointChar = advanceChar(nextPointChar);
@@ -1009,106 +995,72 @@ canvas.addEventListener('mousedown', (e) => {
             break;
 
         case 'eraser':
-            if (window.audio_eraser) {
-                window.audio_eraser.currentTime = 0;
-                window.audio_eraser.play();
-            }
+            try { if (window.audio_eraser) { window.audio_eraser.currentTime = 0; window.audio_eraser.play(); } } catch(err){}
             isDrawing = true; 
             break;
 
         case 'straightLine':
-            if (!isDrawingLine) {
-                isDrawingLine = true;
-                lineStartPoint = snapPos; 
-            } else {
+            if (!isDrawingLine) { isDrawingLine = true; lineStartPoint = snapPos; } 
+            else {
                 drawnStrokes.push({ type: 'straightLine', p1: lineStartPoint, p2: snapPos, color: currentLineColor, width: 3 });
-                isDrawingLine = false;
-                lineStartPoint = null;
-                redrawAllStrokes();
+                isDrawingLine = false; lineStartPoint = null; redrawAllStrokes();
             }
             break;
             
-        case 'line': // Doğru
-            if (!isDrawingInfinityLine) {
-                isDrawingInfinityLine = true;
-                lineStartPoint = pos;
-            } else {
-                const label1 = nextPointChar;
-                const label2 = advanceChar(label1);
-                nextPointChar = advanceChar(label2);
+        case 'line': 
+            if (!isDrawingInfinityLine) { isDrawingInfinityLine = true; lineStartPoint = pos; } 
+            else {
+                const label1 = nextPointChar; const label2 = advanceChar(label1); nextPointChar = advanceChar(label2);
                 drawnStrokes.push({ type: 'line', p1: lineStartPoint, p2: pos, color: currentLineColor, width: 3, label1: label1, label2: label2 });
-                isDrawingInfinityLine = false;
-                lineStartPoint = null;
-                redrawAllStrokes();
+                isDrawingInfinityLine = false; lineStartPoint = null; redrawAllStrokes();
             }
             break;
 
-        case 'segment': // Doğru Parçası
-            if (!isDrawingSegment) {
-                isDrawingSegment = true;
-                lineStartPoint = snapPos;
-            } else {
-                const label1 = nextPointChar;
-                const label2 = advanceChar(label1);
-                nextPointChar = advanceChar(label2);
+        case 'segment': 
+            if (!isDrawingSegment) { isDrawingSegment = true; lineStartPoint = snapPos; } 
+            else {
+                const label1 = nextPointChar; const label2 = advanceChar(label1); nextPointChar = advanceChar(label2);
                 drawnStrokes.push({ type: 'segment', p1: lineStartPoint, p2: snapPos, color: currentLineColor, width: 3, label1: label1, label2: label2 });
-                isDrawingSegment = false;
-                lineStartPoint = null;
-                redrawAllStrokes();
+                isDrawingSegment = false; lineStartPoint = null; redrawAllStrokes();
             }
             break;
 
-        case 'ray': // Işın
-            if (!isDrawingRay) {
-                isDrawingRay = true;
-                lineStartPoint = pos;
-            } else {
-                const label1 = nextPointChar;
-                const label2 = advanceChar(label1);
-                nextPointChar = advanceChar(label2);
+        case 'ray': 
+            if (!isDrawingRay) { isDrawingRay = true; lineStartPoint = pos; } 
+            else {
+                const label1 = nextPointChar; const label2 = advanceChar(label1); nextPointChar = advanceChar(label2);
                 drawnStrokes.push({ type: 'ray', p1: lineStartPoint, p2: pos, color: currentLineColor, width: 3, label1: label1, label2: label2 });
-                isDrawingRay = false;
-                lineStartPoint = null;
-                redrawAllStrokes();
+                isDrawingRay = false; lineStartPoint = null; redrawAllStrokes();
             }
             break;
             
-        // --- KRİTİK ÇOKGEN BLOĞU (DÜZELTİLDİ) ---
+        // --- ÇOKGENLER ---
         case 'draw_polygon_circle':
         case 'draw_polygon_3_sides':
         case 'draw_polygon_4_sides':
         case 'draw_polygon_5_sides':
         case 'draw_polygon_6_sides':
         case 'draw_polygon_7_sides':
-        case 'draw_polygon_8_sides': // <-- KANKA BU SATIRI EKLE
+        case 'draw_polygon_8_sides':
             
-            // 1. Tıklama (Merkezi ayarlama)
-            if (window.tempPolygonData && window.tempPolygonData.center === null) 
-            {
+            if (window.tempPolygonData && window.tempPolygonData.center === null) {
                  window.tempPolygonData.center = snapPos;
                  window.PolygonTool.state.isDrawing = true; 
                  polygonPreviewLabel.classList.remove('hidden');
             } 
-            // 2. Tıklama (Çizimi bitirme)
-            else if (window.tempPolygonData && window.tempPolygonData.center) 
-            {
+            else if (window.tempPolygonData && window.tempPolygonData.center) {
                 const finalRadius = window.tempPolygonData.radius || 0;
                 const finalRotation = window.tempPolygonData.rotation || 0;
                 
-                if (window.tempPolygonData.type === 0) { 
-                    window.PolygonTool.finalizeCircle(finalRadius);
-                } else {
-                    window.PolygonTool.finalizeDraw(finalRadius, finalRotation);
-                }
+                if (window.tempPolygonData.type === 0) window.PolygonTool.finalizeCircle(finalRadius);
+                else window.PolygonTool.finalizeDraw(finalRadius, finalRotation);
                 
                 polygonPreviewLabel.classList.add('hidden');
                 setActiveTool('none'); 
             }
             break;
-        // --- ÇOKGEN BLOĞU SONU ---
     }
 });
-
 canvas.addEventListener('mousemove', (e) => {
 
     // 'move' modu mantığı 'mousemove' İÇİNE TAŞINDI
@@ -1506,7 +1458,14 @@ canvas.addEventListener('mouseup', () => {
 
 // --- DOKUNMATİK BAŞLANGIÇ (TOUCHSTART) ---
 canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault(); 
+    if (e.touches.length === 1) e.preventDefault();
+    
+    // --- YENİ EKLENEN KISIM: MENÜLERİ GİZLE ---
+    if (penOptions) penOptions.classList.add('hidden');
+    if (lineOptions) lineOptions.classList.add('hidden');
+    if (polygonOptions) polygonOptions.classList.add('hidden');
+    if (oyunlarOptions) oyunlarOptions.classList.add('hidden');
+    if (fillOptions) fillOptions.classList.add('hidden'); 
     const pos = getEventPosition(e);
     const snapPos = snapTarget || pos;
     currentMousePos = pos; 
@@ -2051,11 +2010,12 @@ async function renderPDFPage(num) {
     img.src = tempCanvas.toDataURL();
 }
 
-// Resmi Canvas Nesnesi Olarak Ekleyen Fonksiyon
+// app.js içindeki 'addNewImageToCanvas' fonksiyonunu bul ve sonuna şunu ekle:
+
 function addNewImageToCanvas(img, isPDF = false) {
+    // ... (Mevcut boyutlandırma kodların) ...
     let startWidth = 400; 
     if (img.width < 400) startWidth = img.width;
-    
     let scaleFactor = startWidth / img.width;
     let startHeight = img.height * scaleFactor;
 
@@ -2069,16 +2029,25 @@ function addNewImageToCanvas(img, isPDF = false) {
         rotation: 0 
     };
     
+    // PDF sayfasıysa eskisini sil (yerine yenisi gelsin)
+    if (isPDF && pdfImageStroke) {
+         drawnStrokes = drawnStrokes.filter(s => s !== pdfImageStroke);
+    }
+
     drawnStrokes.push(newStroke);
     
-    // Eğer bu bir PDF sayfasıysa, referansını sakla ki sonraki sayfayı üzerine yazabilelim
     if (isPDF) {
         pdfImageStroke = newStroke;
     }
     
+    // --- YENİ EKLENEN KISIM: KAPAT BUTONUNU GÖSTER ---
+    if (closePdfButton) {
+        closePdfButton.classList.remove('hidden');
+    }
+    // --------------------------------------------------
+    
     redrawAllStrokes();
 }
-
 // --- ARAÇ RENGİ DEĞİŞTİRME MANTIĞI (SİYAH / NEON / TOK MAVİ) ---
 const toolColorBtn = document.getElementById('btn-tool-color');
 let isBlackTheme = false;
@@ -2137,6 +2106,26 @@ window.addEventListener('load', () => {
         }
     });
 });
+
+// --- PDF / RESİM KAPATMA BUTONU MANTIĞI ---
+if (closePdfButton) {
+    closePdfButton.addEventListener('click', () => {
+        // 1. Hafızadaki "image" (resim/pdf) nesnelerini sil
+        drawnStrokes = drawnStrokes.filter(stroke => stroke.type !== 'image');
+        window.drawnStrokes = drawnStrokes;
+
+        // 2. PDF değişkenlerini sıfırla
+        currentPDF = null;
+        pdfImageStroke = null;
+        
+        // 3. Butonları Gizle
+        closePdfButton.classList.add('hidden');
+        if(pdfControls) pdfControls.classList.add('hidden');
+        
+        // 4. Ekranı güncelle
+        redrawAllStrokes();
+    });
+}
 
 // --- BAŞLANGIÇ ---
 window.addEventListener('load', resizeCanvas);
