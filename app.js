@@ -1658,90 +1658,73 @@ else if (e.touches.length === 1 && currentTool === 'move') {
     }
 });
 
+// --- DOKUNMATİK HAREKET (TOUCHMOVE - DÜZELTİLMİŞ FİNAL) ---
 canvas.addEventListener('touchmove', (e) => {
-    // 1. EKRANIN KAYMASINI ENGELLE (Zıplamanın baş düşmanı)
+    // 1. EKRAN KAYMASINI VE ZIPLAMAYI ENGELLE (EN BAŞTA)
     if (e.cancelable) e.preventDefault(); 
     
-    // 2. Koordinatı sürekli güncelle
-    const pos = getEventPosition(e);
-    currentMousePos = pos;
-
-if (isPinching) {
-    e.preventDefault(); 
-
-    const p1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    const p2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
-
-    const currentDistance = distance(p1, p2);
-    const currentCenter = { 
-        x: (p1.x + p2.x) / 2, 
-        y: (p1.y + p2.y) / 2 
-    };
-
-    // 1. Zoom (Ölçekleme)
-    const scaleFactor = currentDistance / initialDistance;
-    const newWidth = Math.max(50, initialScale * scaleFactor);
-    const newHeight = selectedItem.height * (newWidth / selectedItem.width); // Oranı koru
-
-    // 2. Pan (Kaydırma/Taşıma)
-    // Zoom merkezini sabit tutacak şekilde pivotu ayarla (pinchingCenter)
-    const dx_center = currentCenter.x - initialCenter.x;
-    const dy_center = currentCenter.y - initialCenter.y;
-
-    selectedItem.width = newWidth;
-    selectedItem.height = newHeight;
-
-    // Basit kaydırma (Pivotu sabit tutma denklemi karmaşıktır, basit kaydırma uyguluyoruz)
-    selectedItem.x = originalStartPos.x + dx_center;
-    selectedItem.y = originalStartPos.y + dy_center;
-
-    redrawAllStrokes();
-    return;
-}
-// Eğer isPinching false ise ve isMoving true ise, normal taşıma mantığı devam eder.
-if (currentTool === 'move' && isMoving) {
-    // ... (Mevcut tek parmak taşıma/kaydırma mantığı devam eder)
-}
-    if (currentTool === 'ruler' || currentTool === 'gonye' || currentTool === 'aciolcer' || currentTool === 'pergel') return;
-    e.preventDefault(); 
-    if (currentTool === 'none') return;
+    // POS DEĞİŞKENİNİ BURADA BİR KERE OLUŞTURUYORUZ (Artık aşağıda tekrar oluşturmayacağız)
     const pos = getEventPosition(e);
     currentMousePos = pos; 
 
-    // 1. Taşıma (Move)
-    // --- TAŞIMA (MOVE) MANTIĞI (MOUSE) ---
-    if (currentTool === 'move' && isMoving) {
-        const pos = getEventPosition(e);
+    // 2. PINCH (ZOOM) KONTROLÜ
+    if (isPinching) {
+        const p1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        const p2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
+
+        const currentDistance = distance(p1, p2);
+        const currentCenter = { 
+            x: (p1.x + p2.x) / 2, 
+            y: (p1.y + p2.y) / 2 
+        };
+
+        const scaleFactor = currentDistance / initialDistance;
+        
+        // Güvenlik kontrolü: selectedItem yoksa hata vermesin
+        if (selectedItem) {
+            const newWidth = Math.max(50, initialScale * scaleFactor);
+            const newHeight = selectedItem.height * (newWidth / selectedItem.width); 
+
+            const dx_center = currentCenter.x - initialCenter.x;
+            const dy_center = currentCenter.y - initialCenter.y;
+
+            selectedItem.width = newWidth;
+            selectedItem.height = newHeight;
+            selectedItem.x = originalStartPos.x + dx_center;
+            selectedItem.y = originalStartPos.y + dy_center;
+        }
+
+        redrawAllStrokes();
+        return;
+    }
+
+    // 3. FİZİKSEL ARAÇ KONTROLÜ
+    if (currentTool === 'ruler' || currentTool === 'gonye' || currentTool === 'aciolcer' || currentTool === 'pergel') return;
+    
+    if (currentTool === 'none') return;
+
+    // 4. TAŞIMA (MOVE) MANTIĞI
+    if (currentTool === 'move' && isMoving && selectedItem) {
         const dx = pos.x - dragStartPos.x;
         const dy = pos.y - dragStartPos.y;
         
-        // 1. RESİM BOYUTLANDIRMA (YENİ EKLENEN KISIM)
         if (selectedPointKey === 'image_resize') {
-            // Merkezden fareye olan mesafeyi hesapla
             const distFromCenterX = Math.abs(pos.x - selectedItem.x);
             const distFromCenterY = Math.abs(pos.y - selectedItem.y);
-            
-            // Genişlik/Yükseklik = Merkezden uzaklığın 2 katı
-            // (Min 20px koruması ekledik ki resim kaybolmasın)
             selectedItem.width = Math.max(20, distFromCenterX * 2);
             selectedItem.height = Math.max(20, distFromCenterY * 2);
         }
-        // 2. ÇOKGEN DÖNDÜRME
         else if (selectedPointKey === 'rotate') {
             const center = selectedItem.center;
             const r_dx = pos.x - center.x;
             const r_dy = pos.y - center.y;
             const newAngleRad = Math.atan2(r_dy, r_dx); 
             selectedItem.rotation = newAngleRad * (180 / Math.PI);
-        
         } 
-        // 3. ÇOKGEN BOYUTLANDIRMA
         else if (selectedPointKey === 'resize') {
             const center = selectedItem.center;
             selectedItem.radius = distance(center, pos);
-        
         } 
-        // 4. ÇİZGİ UÇLARI DÖNDÜRME
         else if (rotationPivot) { 
             const pivot = rotationPivot;
             const movingPointKey = selectedPointKey; 
@@ -1750,11 +1733,10 @@ if (currentTool === 'move' && isMoving) {
             const currentAngle = Math.atan2(r_dy, r_dx);
             selectedItem[movingPointKey].x = pivot.x + Math.cos(currentAngle) * selectedItem.startRadius;
             selectedItem[movingPointKey].y = pivot.y + Math.sin(currentAngle) * selectedItem.startRadius;
-        
         } 
-        // 5. GENEL TAŞIMA (Resim Gövdesi, Çokgen Merkezi vb.)
         else {
-            if (selectedPointKey === 'self') { // Resim veya Nokta gövdesi
+            // Genel Taşıma
+            if (selectedPointKey === 'self') { 
                 selectedItem.x = originalStartPos.x + dx;
                 selectedItem.y = originalStartPos.y + dy;
             } else if (selectedPointKey === 'p1') {
@@ -1773,12 +1755,11 @@ if (currentTool === 'move' && isMoving) {
                 }
             }
         }
-        
         redrawAllStrokes();
         return; 
     }
 
-    // Akıllı Yakalama
+    // 5. AKILLI YAKALAMA (SNAP)
     const canSnap = (currentTool === 'point' || currentTool === 'straightLine' || currentTool === 'pen' || currentTool === 'segment' || currentTool.startsWith('draw_polygon_'));
     if (canSnap) {
         snapTarget = findSnapPoint(pos);
@@ -1787,12 +1768,12 @@ if (currentTool === 'move' && isMoving) {
     } else { snapTarget = null; snapIndicator.style.display = 'none'; }
 
 
-    // --- ÖN İZLEMELER (KESİKLİ ÇİZGİ) ---
+    // 6. ÖN İZLEMELER (PREVIEW)
     let previewActive = false;
     ctx.globalAlpha = 0.6; 
-    ctx.setLineDash([10, 5]); // <-- KESİKLİ ÇİZGİ AYARI
+    ctx.setLineDash([10, 5]); 
 
-    const endPos = snapTarget || currentMousePos;
+    const endPos = snapTarget || pos; // En başta tanımladığımız 'pos' kullanılıyor
 
     if (currentTool === 'straightLine' && isDrawingLine) {
         redrawAllStrokes(); ctx.beginPath();
@@ -1803,8 +1784,8 @@ if (currentTool === 'move' && isMoving) {
     }
     else if (currentTool === 'line' && isDrawingInfinityLine) {
         redrawAllStrokes();
-        drawInfinityLine(lineStartPoint, currentMousePos, currentLineColor, 3, false);
-        drawDot(lineStartPoint, currentLineColor); drawDot(currentMousePos, currentLineColor);
+        drawInfinityLine(lineStartPoint, pos, currentLineColor, 3, false);
+        drawDot(lineStartPoint, currentLineColor); drawDot(pos, currentLineColor);
         previewActive = true;
     }
     else if (currentTool === 'segment' && isDrawingSegment) {
@@ -1816,15 +1797,15 @@ if (currentTool === 'move' && isMoving) {
     }
     else if (currentTool === 'ray' && isDrawingRay) {
         redrawAllStrokes(); 
-        drawInfinityLine(lineStartPoint, currentMousePos, currentLineColor, 3, true); 
-        drawDot(lineStartPoint, currentLineColor); drawDot(currentMousePos, currentLineColor);
+        drawInfinityLine(lineStartPoint, pos, currentLineColor, 3, true); 
+        drawDot(lineStartPoint, currentLineColor); drawDot(pos, currentLineColor);
         previewActive = true;
     }
     else if (window.tempPolygonData && window.tempPolygonData.center) {
         const center = window.tempPolygonData.center;
         const type = window.tempPolygonData.type;
-        const currentRadius = distance(center, currentMousePos);
-        const dx = currentMousePos.x - center.x; const dy = currentMousePos.y - center.y;
+        const currentRadius = distance(center, pos);
+        const dx = pos.x - center.x; const dy = pos.y - center.y;
         const currentRotationRad = Math.atan2(dy, dx); 
         const currentRotationDeg = currentRotationRad * (180 / Math.PI); 
 
@@ -1833,7 +1814,6 @@ if (currentTool === 'move' && isMoving) {
 
         redrawAllStrokes(); 
         
-        // Kesikli Çizgiyle Şekli Çiz
         ctx.beginPath();
         if (type === 0) ctx.arc(center.x, center.y, currentRadius, 0, 2 * Math.PI);
         else {
@@ -1848,8 +1828,8 @@ if (currentTool === 'move' && isMoving) {
         drawDot(center, window.currentLineColor);
         previewActive = true; 
         
-        polygonPreviewLabel.style.left = `${currentMousePos.x}px`;
-        polygonPreviewLabel.style.top = `${currentMousePos.y - 50}px`;
+        polygonPreviewLabel.style.left = `${pos.x}px`;
+        polygonPreviewLabel.style.top = `${pos.y - 50}px`;
         polygonPreviewLabel.classList.remove('hidden');
         const cmRadius = (currentRadius / (window.PolygonTool.PIXELS_PER_CM || 30)).toFixed(1);
         let labelText = (type === 0) ? `Yarıçap: ${cmRadius} cm` : `Kenar: ${((2 * currentRadius * Math.sin(Math.PI / type)) / 30).toFixed(1)} cm`;
@@ -1857,10 +1837,10 @@ if (currentTool === 'move' && isMoving) {
     }
 
     ctx.globalAlpha = 1.0; 
-    ctx.setLineDash([]); // Normale dön
+    ctx.setLineDash([]); 
     if (previewActive) return; 
 
-    // --- Kalem/Silgi Sürükleme ---
+    // 7. KALEM / SİLGİ ÇİZİMİ
     if (!isDrawing) return;
     
     if (currentTool === 'pen') {
@@ -1912,6 +1892,7 @@ if (currentTool === 'move' && isMoving) {
         if (needsRedraw) { drawnStrokes = strokesToKeep; window.drawnStrokes = strokesToKeep; redrawAllStrokes(); }
     }
 });
+
 
 // --- DOKUNMATİK BİTİŞ (TOUCHEND - FİNAL VERSİYON) ---
 canvas.addEventListener('touchend', (e) => {
