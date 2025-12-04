@@ -73,6 +73,8 @@ window.PolygonTool = {
 
     // --- cokgen.js içindeki finalizeDraw fonksiyonu ---
 
+    // --- cokgen.js ---
+
     finalizeDraw: function(radius, rotation) { 
         if (!window.tempPolygonData) return;
         
@@ -85,15 +87,14 @@ window.PolygonTool = {
              return; 
         }
 
-        // DÜZELTME: app.js artık doğru (yerel) koordinatı gönderiyor.
-        // Bu yüzden burada tekrar 'rect.left' ÇIKARMIYORUZ.
+        // DÜZELTME: app.js artık düzeltilmiş koordinat gönderiyor.
+        // Bu yüzden 'rect' hesaplamasını KALDIRDIK ve doğrudan center'ı aldık.
         const centerOnCanvas = {
-            x: center.x, 
+            x: center.x,
             y: center.y
         };
         
         if (window.drawnStrokes && window.redrawAllStrokes) {
-            
             const centerLabel = window.nextPointChar;
             window.nextPointChar = window.advanceChar(centerLabel);
 
@@ -117,10 +118,6 @@ window.PolygonTool = {
         window.tempPolygonData = null;
     },
     
-    // --- finalizeCircle fonksiyonunu da aynı mantıkla güncelleyin ---
-
-    // --- cokgen.js içindeki finalizeCircle fonksiyonu ---
-
     finalizeCircle: function(radius) { 
         if (!window.tempPolygonData) return;
         
@@ -131,7 +128,7 @@ window.PolygonTool = {
              return; 
         }
 
-        // DÜZELTME: Burada da çıkarma işlemini kaldırdık.
+        // DÜZELTME: Burada da 'rect' hesaplaması KALDIRILDI.
         const centerOnCanvas = {
             x: center.x,
             y: center.y
